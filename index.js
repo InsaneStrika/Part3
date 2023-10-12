@@ -6,55 +6,39 @@ app.use(morgan(':method :url :status :res[content-length] - :response-time ms :b
 const cors = require('cors')
 app.use(cors())
 app.use(express.static('dist'))
+require('dotenv').config()
+const Person = require('./models/person')
 
 morgan.token("body", (req, res) => {
     body = req.body
     return JSON.stringify(body);
   });
 
-
-let persons = [
-    {
-        id: 1,
-        name: "Arto Hellas",
-        number: "040-123456"
-      },
-    {
-        id: 2,
-        name: "Ada Lovelace",
-        number: "39-44-5323523"
-      },
-    {
-        id: 3,
-        name: "Dan Abramov",
-        number: "12-43-234345"
-      },
-    {
-      id: 4,
-      name: "Mary Poppendick",
-      number: "39-23-6423122"
-    }
-  ]
-
 app.get('/api/persons', (req, res) => {
-    res.json(persons)
+    Person.find({}).then(persons=>{
+      res.json(persons)
+    })
 })
 
 app.get('/info', (req,res)=>{
-    const size = persons.length
     const time = new Date(Date.now())
-    res.send(`<p>Phonebook has info for ${size} people</p> <p>${time}</p>`)
+    Person.estimatedDocumentCount({})
+    .then((count) => {
+      const message =
+        `<p>Phonebook has info for ${count} people</p> <p>${time}</p>`
+      res.send(message);
+    })
 })
 
 app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const person = persons.find(person => person.id === id)
-    
-    if (person) {
-      response.json(person)
-    } else {
-      response.status(404).end()
-    }
+    Person.findById(request.params.id).then(person=>{
+      if (person) {
+        response.json(person)
+      } else {
+        response.status(404).end()
+      }
+    })
+  
 })
 
 app.delete('/api/persons/:id', (request, response) => {
@@ -64,9 +48,6 @@ app.delete('/api/persons/:id', (request, response) => {
     response.status(204).end()
 })
 
-const generateId = () => {
-    return Math.floor(Math.random()*1000)
-  }
 
 app.post('/api/persons', (request, response) => {
   
@@ -77,27 +58,19 @@ app.post('/api/persons', (request, response) => {
         error: 'Missing fields' 
       })
     }
-    
-    const listed = persons.find(person=>person.name===body.name)
-
-    if(listed) {
-      return response.status(400).json({
-        error: 'Name already exists'
-      })
-    }
-  
-    const person = {
-      id: generateId(),
+      
+    const person = new Person ({
       name: body.name,
       number: body.number
-    }
+    })
   
-    persons = persons.concat(person)
-  
-    response.json(person)
+    person.save().then(result => {
+      console.log(`Added ${body.name} number ${body.number} to phonebook`)
+      response.json(result)
+    })
 })
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })
